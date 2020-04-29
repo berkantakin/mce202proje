@@ -1,0 +1,171 @@
+//int fan_pin = ???;
+int right1 = 13;
+int left1 = 8;
+int right2 = 12;
+int left2 = 9;
+int right_en = 11;
+int left_en = 10;
+int echo = 2;
+int trig = 2;
+char com_direc;  // duruma göre char yapacaz bunlar haberleşme şekline bağlı hep
+char last_direc;
+int com_speed=0;  // ayarlanacak beklemede
+int rotate_speed=0;
+enum stat {READY, DONE};
+byte state = READY;
+void setup() {
+  pinMode(right1, OUTPUT);
+  pinMode(right2, OUTPUT);
+  pinMode(right_en, OUTPUT);
+  pinMode(left1, OUTPUT);
+  pinMode(left2, OUTPUT);
+  pinMode(left_en, OUTPUT);
+  //pinMode(fan_pin, OUTPUT);
+  Serial.begin(115200);
+  attachInterrupt(digitalPinToInterrupt(echo), again_distance, CHANGE);
+
+}
+
+void loop() {
+  long distance, times;
+  cli();
+  pinMode(trig, OUTPUT);
+  digitalWrite(trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+  pinMode(echo, INPUT);
+  state = READY;
+  sei();
+  times = pulseIn(echo, HIGH);
+  if (state == DONE ) {
+    distance = (times / 2) / 29.1;
+    if (distance > 200 || distance < 0) {
+      Serial.println("Menzil Disi");
+    }
+    else {
+      Serial.print(distance);
+      Serial.println(" cm");
+    }
+  }
+  delay(500);
+ 
+}
+void coming_mesage(){
+  //diğer arduinodan gelen mesajları işlicek olduğumuz kısım burası ve değerlendirecek
+  // com direc ayarlanmalı 
+  //devamlı bir mesaj varmı yok mu kontrol etmeli varsa bu kısımı çağırmak lazım
+  switch (com_direc) {
+      case 'A' :
+        Serial.println("GO");
+    last_direc=com_direc;
+        forward();
+        break;
+      case 'B' :
+        Serial.println("BACK");
+    last_direc=com_direc;
+    back();
+         
+        break;
+      case 'C' :
+        Serial.println("LEFT");
+    rotate_speed=com_speed/2;
+    if(last_direc == 'A'){
+      forward_left();
+    }else{
+      back_left();
+    }
+        break;
+      case 'D' :
+        Serial.println("RIGHT");
+    rotate_speed=com_speed/2;
+    if(last_direc == 'A'){
+      forward_right();
+    }else{
+      back_right();
+    }
+        
+        break;
+    }
+}
+void fan(){
+  //devamlı çalışacak bu duruma göre kapatma atarız 
+  //pinleri ayarlanacak sonra 2 satır kod yazılacak
+  // digitalWrite(fan_pin, HIGH);
+  
+  
+}
+void again_distance() {
+  if (state == READY) {
+    if (digitalRead(echo)) {
+      state = DONE;
+      Serial.write('\\');
+    }
+  }
+}
+
+void forward() {
+  digitalWrite(right1, HIGH);
+  digitalWrite(left1, HIGH);
+  digitalWrite(right2, LOW);
+  digitalWrite(left2, LOW);
+  analogWrite(right_en, com_speed);
+  analogWrite(left_en, com_speed);
+
+}
+void back() {
+  digitalWrite(right1, LOW);
+  digitalWrite(left1, LOW);
+  digitalWrite(right2, HIGH);
+  digitalWrite(left2, HIGH);
+  analogWrite(right_en, com_speed);
+  analogWrite(left_en, com_speed);
+
+}
+void forward_left() {
+  digitalWrite(right1, HIGH);
+  digitalWrite(left1, HIGH);
+  digitalWrite(right2, LOW);
+  digitalWrite(left2, LOW);
+  analogWrite(right_en, com_speed);
+  analogWrite(left_en, rotate_speed);
+
+}
+void forward_right() {
+  digitalWrite(right1, HIGH);
+  digitalWrite(left1, HIGH);
+  digitalWrite(right2, LOW);
+  digitalWrite(left2, LOW);
+  analogWrite(right_en, rotate_speed);
+  analogWrite(left_en, com_speed);
+
+}
+void back_left() {
+  digitalWrite(right1, LOW);
+  digitalWrite(left1, LOW);
+  digitalWrite(right2, HIGH);
+  digitalWrite(left2, HIGH);
+  analogWrite(right_en, com_speed);
+  analogWrite(left_en, rotate_speed);
+
+}
+void back_right() {
+  digitalWrite(right1, LOW);
+  digitalWrite(left1, LOW);
+  digitalWrite(right2, HIGH);
+  digitalWrite(left2, HIGH);
+  analogWrite(right_en, rotate_speed);
+  analogWrite(left_en, com_speed);
+
+}
+void stopp() {
+  digitalWrite(right1, LOW);
+  digitalWrite(left1, LOW);
+  digitalWrite(right2, LOW);
+  digitalWrite(left2, LOW);
+  analogWrite(right_en, 0);
+  analogWrite(left_en, 0);
+
+}
+
