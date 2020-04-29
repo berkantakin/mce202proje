@@ -7,9 +7,9 @@ int right_en = 11;
 int left_en = 10;
 int echo = 2;
 int trig = 2;
-char com_direc;  // duruma göre char yapacaz bunlar haberleşme şekline bağlı hep
+char com_direc; 
 char last_direc;
-int com_speed=0;  // ayarlanacak beklemede
+int com_speed=0;  
 int rotate_speed=0;
 enum stat {READY, DONE};
 byte state = READY;
@@ -53,9 +53,7 @@ void loop() {
  
 }
 void coming_mesage(){
-  //diğer arduinodan gelen mesajları işlicek olduğumuz kısım burası ve değerlendirecek
-  // com direc ayarlanmalı 
-  //devamlı bir mesaj varmı yok mu kontrol etmeli varsa bu kısımı çağırmak lazım
+
   switch (com_direc) {
       case 'A' :
         Serial.println("GO");
@@ -90,8 +88,7 @@ void coming_mesage(){
     }
 }
 void fan(){
-  //devamlı çalışacak bu duruma göre kapatma atarız 
-  //pinleri ayarlanacak sonra 2 satır kod yazılacak
+  
   // digitalWrite(fan_pin, HIGH);
   
   
