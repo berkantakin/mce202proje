@@ -1,4 +1,6 @@
 # mce202proje
 projede  haberleşme kısmında kaldık haberleşme ile ilgili sorunu çözmeye çalışıyoruz
-ivme sensörü olmadığı için bu görevi keypad ile yapmaya karar verdik
-fan haberleşmeden sonra eklenecek fan görevi yapacak bir dc mootor takıcaz
+ivme sensörü olmadığı için uzaktan kontrolde keypad kullanamaya  karar verdik (yön hız ayarlamak için)
+fan haberleşmeden sonra eklenecek fan görevi yapacak bir dc motor takıcaz
+simülasyonlar en son düzenlenicek (kablolar falan renklendircez)
+mesafe sensörünün mesafe ölçümündeki hata düzeltilecek(50 cm'i 47 cm ölçüyor) 
