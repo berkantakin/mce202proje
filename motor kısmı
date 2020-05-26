@@ -1,32 +1,71 @@
-//int fan_pin = ???;
+#include <Wire.h>
+int fan_pin = 6;  // fan pini
+//alttaki 4 pin arataki tekerlerin konumu belirliyor
 int right1 = 13;
 int left1 = 8;
 int right2 = 12;
 int left2 = 9;
+//alttaki 2 pin ise yukarıdaki pinlere çalışma izni veriyor (çalıştırıyor yani onları)
 int right_en = 11;
 int left_en = 10;
+//alttaki 2 pin uzaklık sensörü için kullanıldı
 int echo = 2;
 int trig = 2;
-char com_direc; 
-char last_direc;
-int com_speed=0;  
-int rotate_speed=0;
+// diğer arduinodan gelen veriler hız ve yön
+char com_direc;
+byte com_speed = 0;
+char last_direc;  //bu ise sağa ve sola dönüşler için
+int rotate_speed = 0; //bu ise sağa ve sola dönüşlerde hız ayarı için
+int change_or_notchange = 1;
+int last_distance = 999;
 enum stat {READY, DONE};
 byte state = READY;
 void setup() {
+  //pinler çıkış olarak ayarlandı
   pinMode(right1, OUTPUT);
   pinMode(right2, OUTPUT);
   pinMode(right_en, OUTPUT);
   pinMode(left1, OUTPUT);
   pinMode(left2, OUTPUT);
   pinMode(left_en, OUTPUT);
-  //pinMode(fan_pin, OUTPUT);
-  Serial.begin(115200);
-  attachInterrupt(digitalPinToInterrupt(echo), again_distance, CHANGE);
+  pinMode(fan_pin, OUTPUT);
+  Serial.begin(9600);
+  Wire.begin(2);  //slave olduğu belirlendi
+  Wire.onReceive(receiveEvent);
+  attachInterrupt(digitalPinToInterrupt(echo), again_distance, CHANGE); // interrupt
 
 }
-
+void receiveEvent(int bytesReady)
+{
+  //mesaj geldiğinde okuma yapılacak bölüm
+  while (Wire.available())
+  {
+    Serial.println("Message came ");
+    char a = Wire.read();
+    byte b = Wire.read();
+    //gelen verilerin neler olduğu yazdırıldı aşağıda
+    display(a, b);
+    com_direc = a;
+    com_speed = b;
+    coming_mesage_analyze();
+  }
+}
+void display(char a, byte b) {
+  //gelen verilerin neler olduğunu yazdırdığımız kısım hız yön
+  Serial.print("The direction is : ");
+  if (a == 'A') {
+    Serial.println("FORWARD");
+  } else if (a == 'B') {
+    Serial.println("BACK");
+  } else if (a == 'C') {
+    Serial.println("LEFT");
+  } else if (a == 'D') {
+    Serial.println("RIGHT");
+  }
+  Serial.print("The speed is : "); Serial.println(b);
+}
 void loop() {
+
   long distance, times;
   cli();
   pinMode(trig, OUTPUT);
@@ -41,67 +80,78 @@ void loop() {
   times = pulseIn(echo, HIGH);
   if (state == DONE ) {
     distance = (times / 2) / 29.1;
-    if (distance > 200 || distance < 0) {
-      Serial.println("Menzil Disi");
+    if (last_distance != distance) {
+      last_distance = distance;
+      change_or_notchange = 1;
+      if (distance > 200 || distance < 0) {
+        Serial.println("Menzil Disi");
+      }
+      else {
+        Serial.print(distance); Serial.println(" cm");
+      }
     }
-    else {
-      Serial.print(distance);
-      Serial.println(" cm");
+    if (distance < 30) {
+      stopp();
     }
   }
-  delay(500);
- 
-}
-void coming_mesage(){
 
-  switch (com_direc) {
-      case 'A' :
-        Serial.println("GO");
-    last_direc=com_direc;
-        forward();
-        break;
-      case 'B' :
-        Serial.println("BACK");
-    last_direc=com_direc;
-    back();
-         
-        break;
-      case 'C' :
-        Serial.println("LEFT");
-    rotate_speed=com_speed/2;
-    if(last_direc == 'A'){
-      forward_left();
-    }else{
-      back_left();
-    }
-        break;
-      case 'D' :
-        Serial.println("RIGHT");
-    rotate_speed=com_speed/2;
-    if(last_direc == 'A'){
-      forward_right();
-    }else{
-      back_right();
-    }
-        
-        break;
-    }
+  delay(500);
+
 }
-void fan(){
-  
-  // digitalWrite(fan_pin, HIGH);
-  
-  
+
+
+void coming_mesage_analyze() {
+
+  //diğer arduinodan gelen mesajları işlicek olduğumuz kısım burası ve değerlendirecek
+  fan(); // the fan start to run
+  //Motorların çalışma yönü ve hızları belirlendi aşağıda
+  //sağ sola sönüş için diğer taraftaki motorun hızı yarıya indirildi
+  switch (com_direc) {
+    case 'A' :
+      last_direc = com_direc;
+      forward();
+      break;
+    case 'B' :
+      last_direc = com_direc;
+      back();
+      break;
+    case 'C' :
+      rotate_speed = com_speed / 2;
+      if (last_direc == 'A') {
+        forward_left();
+      } else {
+        back_left();
+      }
+      break;
+    case 'D' :
+      rotate_speed = com_speed / 2;
+      if (last_direc == 'A') {
+        forward_right();
+      } else {
+        back_right();
+      }
+
+      break;
+  }
+}
+
+void fan() {
+  analogWrite(fan_pin, 255);
+
 }
 void again_distance() {
+  //başka işlem yapılırken mesafe ölçümündeki değişimin
+  //belirlenmesi için interrupt ekledik
   if (state == READY) {
     if (digitalRead(echo)) {
       state = DONE;
-      Serial.write('\\');
+
     }
   }
 }
-
+//aşağıdaki fonksiyonlar aracın çalışma yönünü ve hızını dc motorlara ilettiğimiz kısımdır
+//fonksiyonun adı  aracın çalışma yönünü belirtir.
+//bunlara bağlı olarak motorların dönüş yönleri ve hızları girildi.
 void forward() {
   digitalWrite(right1, HIGH);
   digitalWrite(left1, HIGH);
@@ -157,6 +207,7 @@ void back_right() {
 
 }
 void stopp() {
+  analogWrite(fan_pin, 255);
   digitalWrite(right1, LOW);
   digitalWrite(left1, LOW);
   digitalWrite(right2, LOW);
@@ -165,4 +216,3 @@ void stopp() {
   analogWrite(left_en, 0);
 
 }
-
