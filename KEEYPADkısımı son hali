@@ -1,0 +1,381 @@
+#include <Keypad.h>
+#include <Wire.h>
+
+const byte Row = 4; // keypad satır sayısı
+const byte Coll = 4; // keypad sütün sayısı
+char key[Row][Coll] =
+{
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+byte velocity;
+char directionn;
+int permission1 = 0; // ilk ileri veya geri verileri olmadan sağ sola dönüş yapılamaz
+int permission2 = 0; //yön olmadan hız verisi girilemez
+int permission3 = 0; //  veri yokken anlık veriler yazılamaz
+int first_time = 0, first_time1 = 0, first_time2 = 0; // gelinen yerde yazdırlına ilk bilginin sadece 1 defa yazdırılması için kullanıldı bunlar
+int after_set_direction = 0; // yön ayarlanmış hız ayarlanmalı artık
+//aşağıda son veriler hafızaya alındı
+byte last_speed;
+char last_direc = 5;
+//aşağıda keypad ayarlandı
+byte Rowpin[Row] = {3, 4, 5, 6};
+byte Collpin[Coll] = {7, 8, 9, 10};
+Keypad keypad = Keypad(makeKeymap(key), Rowpin, Collpin, Row, Coll);
+
+void setup()
+{
+  Serial.begin(9600);
+  Wire.begin(); //master olduğu belirlendi
+}
+
+void loop()
+{
+
+  if (first_time == 0) {
+    Serial.println("1 CHANGE DIRECTION 2 CHANGE SPEED 3 DISPLAY ALL INFO SPEED AND DIRECTION");
+    first_time = 1;
+  }
+  char choice = keypad.waitForKey();
+  if (choice) {
+    while (true) {
+      if (choice == '1' ) {
+        set_direction(4); //bitti
+        choice;
+        break;
+      } else if (choice == '2' ) {
+
+        directionn = last_direc;
+        if (permission2 == 0) {
+          if (directionn == 5) {
+            Serial.println("There is no direction Please to select direction");
+            Serial.println("1 CHANGE DIRECTION 2 CHANGE SPEED 3 DISPLAY ALL INFO SPEED AND DIRECTION");
+            break;
+          } else {
+            permission2 = 1;
+          }
+        }
+        set_speed('1'); // bitti
+        send_mesage(directionn, velocity);
+        choice;
+        break;
+      } else if (choice == '3') { // bitti
+        if (permission1 == 0  || permission2 == 0 || permission3 == 0) {
+          Serial.println("There is no information yet");//henüz veri yok
+        } else {
+          Serial.print("ANLIK HIZINIZ "); Serial.println(last_speed);
+          Serial.print("ANLIK YÖNÜNÜZ ");
+          if (last_direc == 'A') {
+            Serial.println("FORWARD");
+          } else if (last_direc == 'B') {
+            Serial.println("BACK");
+          } else if (last_direc == 'C') {
+            Serial.println("LEFT");
+          } else if (last_direc == 'D') {
+            Serial.println("RIGHT");
+          }
+        }
+        Serial.println("1 CHANGE DIRECTION 2 CHANGE SPEED 3 DISPLAY ALL INFO SPEED AND DIRECTION");
+        choice;
+        break;
+      } else {
+        Serial.println("Wrong choice 1 2 3 ONLY ACCEPT");
+        Serial.println(choice);
+        choice = keypad.waitForKey();
+      }
+    }
+    if (after_set_direction == 1) {
+      //hız ayarlama yön girilmiş demek
+      if (permission3 == 0) {
+        set_speed('*');
+        send_mesage(directionn, velocity);
+        after_set_direction = 0;
+        permission3 = 1;
+      } else {
+        while (true) {
+          Serial.println("1 ENTER NEW SPEED  2 KEEP ON OLD SPEED ");
+          int choice1 = keypad.waitForKey();
+          if (choice1 == '1') {
+            set_speed('*');
+            send_mesage(directionn, velocity);
+            after_set_direction = 0;
+            choice1 = 0;
+            break;
+          } else if (choice1 == '2') {
+            //mesaj kısmına göndercez eski hızla beraber
+            send_mesage(directionn, last_speed);
+            after_set_direction = 0;
+            choice1 = 0;
+            break;
+          } else {
+            Serial.println("again select");
+          }
+        }
+      }
+    }
+  }
+
+}
+
+
+
+void set_direction(char tkey) {
+  //aracın yönünün seçileceği fonksiyon burası gerekli koşullara bağlı olarak
+  //araç ilk çalışma anında ileri ya da geri mi gidecek o belirtilir
+  //sonrasında sağ sola döneceği belirlenir
+  if (first_time1 == 0) {
+    Serial.println("welcome A FORWARD B BACK C LEFT D RIGHT");
+    first_time1 = 1;
+    //tüm işlemler bitene kadar bir daha yazılmıcak üstteki
+  }
+  char nkey = keypad.waitForKey();
+  //switch-case ile verinin ne olduğu belirlendi
+  if (nkey) {
+    switch (nkey) {
+      case 'A' :
+        Serial.println("GO");
+
+        break;
+      case 'B' :
+        Serial.println("BACK");
+
+        break;
+      case 'C' :
+        Serial.println("LEFT");
+
+        break;
+      case 'D' :
+        Serial.println("RIGHT");
+
+        break;
+      default :
+        Serial.println(" A B C D ENTER ONLY ");
+        set_direction(tkey);
+        break;
+
+    }
+  }
+  //ilk durumdaki yön iler mi geri mi kontrol edildi bu ifte
+  if (permission1 == 0) {
+    if (nkey == 'C' || nkey == 'D') {
+      Serial.println("You need to select Forward or back   TRY AGAIN");
+      Serial.println(" A FORWARD B BACK ");
+      set_direction(tkey);
+    } else {
+      permission1 = 1;
+    }
+  }
+  Serial.println("Are you sure 1 yes another key change ");
+  //girdiğimiz veriden emin miyiz o kontrol edildi 1 evet diğer tuşlar hayır
+  char answer = keypad.waitForKey();
+  if (answer == '1') {
+    directionn = nkey;
+    nkey = 5;
+    after_set_direction = 1;
+    //Serial.println(directionn);
+
+  } else {
+    Serial.println("again select");
+    Serial.println("A FORWARD B BACK C LEFT D RIGHT");
+    nkey = 5;
+    set_direction(tkey);
+  }
+
+}
+
+
+
+void set_speed(char skey) {
+  //arac hızının belirlendiği kısım
+  // ilk defa buraya geliniyorsa hız girilmek zorundadır
+  // diğer gelişlerde hız girilme zorunluğu yoktur son hız korunabilir
+  char k, b, c;
+  int count_number = 0;
+  if (permission3 != 0) {
+    if (first_time2 == 0) {
+      Serial.println(" SET SPEED ENTER * AND ACCEPT ALL NUMBER   0 GO BACK ANT KEEP ON LAST SPEED ");
+      first_time2 = 1;
+    }
+    if (first_time2 == 0 || first_time2 == 1) {
+      skey = keypad.waitForKey();
+      count_number = 0;
+    }
+  } else {
+    skey = '*';
+  }
+  if (skey == '*') {
+    first_time2 = 2;
+    boolean a = true;
+    while (a) {
+      Serial.println("enter speed BETWEEN 0 AND 255");
+      char user_data = keypad.waitForKey();
+      Serial.println(user_data);
+      //girilen veri sayı mı değil mi kontrol edildi
+      if ( user_data >= '0' && user_data <= '9') {
+        //ilk değerse 0 1 ve 2 değerlerini alabilir o kontrol edildi
+        //259 296 gibi veriler ihmal edildi nasıl olsa 255 olarak çalışacak diğer tarafta
+        if (user_data <= '2' && count_number == 0)
+        {
+          k = user_data;
+          count_number = count_number + 1;
+        } else if (count_number != 0) {
+          if (count_number == 1) {
+            b = user_data;
+          } else {
+            c = user_data;
+          }
+          count_number = count_number + 1;
+          if (count_number == 3) {
+            char_to_byte(k, b, c);
+            count_number = 0;
+            skey = 5;
+            break;
+          }
+        } else {
+          Serial.println(" try again");
+          set_speed('*');
+        }
+      } else {
+        Serial.println("WRONG DATA TRY AGAIN");
+        set_speed('*');
+      }
+    }
+
+  } else if (skey == '0') {
+    Serial.println("GO BACK MAIN MENU");
+    velocity = last_speed;
+    skey = 5;
+    return;
+  } else {
+    Serial.println("TRY AGAIN");
+    set_speed('1');
+  }
+}
+void char_to_byte(char a, char b, char c) {
+  //veriler chardan byte çevrildi
+  //bu işlem  arac hızını belirlemek için yapıldı
+  //char olarak gönderilen veriyle çalışamadık o sebeple byte yaptık
+  char tt[3];
+  tt[0] = a;
+  tt[1] = b;
+  tt[2] = c;
+  int s = 0;
+  int result, last_result;
+  while (s < 3) {
+    switch (tt[s]) {
+      case '1' :
+        result = 1;
+
+        break;
+      case '2' :
+        result = 2;
+        break;
+      case '3' :
+        result = 3;
+
+        break;
+      case '4' :
+        result = 4;
+
+        break;
+      case '5' :
+        result = 5;
+
+        break;
+      case '6' :
+        result = 6;
+
+        break;
+      case '7' :
+        result = 7;
+
+        break;
+      case '8' :
+        result = 8;
+
+        break;
+      case '9' :
+        result = 9;
+
+        break;
+      case '0' :
+        result = 0;
+
+        break;
+      default :
+        Serial.println(" ınss ");
+
+        break;
+    }
+    if (s == 0) {
+      last_result = result * 100;
+    } else if (s == 1) {
+      last_result = last_result + result * 10;
+    } else {
+      last_result = last_result + result;
+    }
+    s = s + 1;
+  }
+  velocity = last_result;
+  //gerekli işlemmlerde chardan byte'a geçiş yapıldı
+
+}
+void send_mesage(char coming_direc, byte coming_speed) {
+  last_direc = coming_direc;
+  last_speed = coming_speed;
+  // son hız ve yön güncelledik
+  //haberleşme I2C olarak yapıldı
+  //buraya gelen verilen son hali yazdırıldı ekrana
+  Serial.print("given  speed "); Serial.println(coming_speed);
+  Serial.print("given  direction ");
+  if (coming_direc == 'A') {
+    Serial.println("FORWARD");
+  } else if (coming_direc == 'B') {
+    Serial.println("BACK");
+  } else if (coming_direc == 'C') {
+    Serial.println("LEFT");
+  } else if (coming_direc == 'D') {
+    Serial.println("RIGHT");
+  }
+  while (true) {
+    //verilerin doğruluğu kontrol edildi
+    Serial.println("ARE YOU SURE ABOUT THEM 1 yes 2 no "); //son kontrol geri dönüşü yok
+    char answer1 = keypad.waitForKey();
+    if (answer1 == '1') {
+      //mesaj gönderildi bu kısımda
+      Wire.beginTransmission(2);
+      byte test[2];
+      test[0] = coming_direc;
+      test[1] = coming_speed;
+      Wire.write(test, 2);
+      Wire.endTransmission();
+      Serial.println("The message sended");
+      //gerekli değişkenler sıfırlandı diğer haberleşme ve geri girişi için
+      first_time1 = 0;
+      first_time = 0;
+      first_time2 = 0;
+      directionn;
+      break;
+    } else if (answer1 == '2') {
+      Serial.println(" 1 set direction 2 set speed ");
+      while (true) {
+        char answer2 = keypad.waitForKey();
+        if (answer2 == '1') {
+          set_direction(3);
+          break;
+        } else if (answer2 == '2') {
+          set_speed('*');
+          break;
+        } else {
+          Serial.println("wrong choice ");
+        }
+      }
+      break;
+    } else {
+      Serial.println("Wrong choice ");
+    }
+  }
+
+}
